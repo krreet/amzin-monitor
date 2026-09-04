@@ -9,6 +9,8 @@ const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID; 
 // -------------------------------------------------------
 
+let outOfStockCounter = 0; // Global counter to throttle out-of-stock screenshots
+
 // Keep-alive server for Render's Free Tier
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -57,6 +59,19 @@ function sendTelegramNotification(message) {
   req.end();
 }
 
+// Helper function to log base64 data cleanly to Render console
+async function logPageScreenshot(page, logTitle) {
+  try {
+    const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 50 });
+    const base64Image = screenshotBuffer.toString('base64');
+    console.log(`\n--- 📸 BASE64 SCREENSHOT BEGIN [${logTitle}] ---`);
+    console.log(`data:image/jpeg;base64,${base64Image}`);
+    console.log(`--- 📸 BASE64 SCREENSHOT END [${logTitle}] ---\n`);
+  } catch (error) {
+    console.error('⚠️ Failed to capture visual snapshot:', error.message);
+  }
+}
+
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function monitorProduct() {
@@ -67,7 +82,6 @@ async function monitorProduct() {
 
   console.log('🚀 Secure Cloud Stock Monitor Initializing...');
 
-  // Target local browser binary compiled during Render's build step
   const customExecutablePath = path.resolve(
     __dirname, 
     'ms-playwright', 
@@ -89,26 +103,31 @@ async function monitorProduct() {
 
   while (true) {
     try {
-      // Navigate to the target page link
       await page.goto(PRODUCT_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-      // 1. SAFETY VALIDATION STEP: Verify if Amazon actually loaded the real item description
+      // Check if Amazon loaded the main product page successfully
       const productTitleExists = await page.$('#productTitle');
 
       if (!productTitleExists) {
-        // If the main title is missing, Amazon likely served a CAPTCHA check or blocked the request
-        console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Verification Blocked: Encountered a CAPTCHA or security page. Skipping this loop to avoid false alarms.`);
+        console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Verification Blocked: Encountered a CAPTCHA or security page.`);
+        await logPageScreenshot(page, 'VERIFICATION_BLOCKED');
       } else {
-        // 2. PARSING STEP: Real product page loaded. Look for the actual unavailable flags.
         const outOfStockElement = await page.$('#outOfStock, .a-color-price:has-text("Currently unavailable")');
 
         if (outOfStockElement) {
+          outOfStockCounter++;
           console.log(`[${new Date().toLocaleTimeString()}] ❌ Item is still out of stock.`);
+          
+          // Throttled: Print out-of-stock screenshot only once every 10 checks to avoid bloating log files
+          if (outOfStockCounter % 10 === 0) {
+            await logPageScreenshot(page, `OUT_OF_STOCK_LOOP_${outOfStockCounter}`);
+          }
         } else {
-          // If the product title loaded perfectly, but outOfStock markers are gone: it is in stock!
           const alertMsg = `🚨 *ALERT! YOUR MONITORED ITEM MIGHT BE IN STOCK!* 🚨\nBuy immediately here: ${PRODUCT_URL}`;
           console.log(`\n${alertMsg}\n`);
           
+          // Instantly dump the screenshot for verification
+          await logPageScreenshot(page, 'IN_STOCK_CONFIRMED');
           sendTelegramNotification(alertMsg);
         }
       }
@@ -116,7 +135,6 @@ async function monitorProduct() {
       console.error(`[${new Date().toLocaleTimeString()}] ⚠️ Error:`, error.message);
     }
 
-    // Extended random interval to help bypass bot tracking algorithms (5 to 11 seconds)
     const randomInterval = 5000 + Math.floor(Math.random() * 6000);
     await delay(randomInterval);
   }
