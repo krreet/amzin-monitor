@@ -3,5 +3,5 @@ services:
     name: ps5-stock-monitor
     env: node
     plan: free
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: npm install && PLAYWRIGHT_BROWSERS_PATH=./ms-playwright npx playwright install chromium
     startCommand: npm start
