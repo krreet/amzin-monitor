@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const https = require('https');
 const http = require('http');
+const path = require('path');
 
 // --- SECURE CONFIGURATION (READ FROM CLOUD SETTINGS) ---
 const PRODUCT_URL = process.env.PRODUCT_URL;
@@ -64,9 +65,11 @@ async function monitorProduct() {
     console.error('[Configuration Error]: No PRODUCT_URL provided in Environment Variables!');
     process.exit(1);
   }
- // 👇 ADD THIS LINE right here to tell Playwright where the browser was saved
-  process.env.PLAYWRIGHT_BROWSERS_PATH = './ms-playwright';
-  
+
+  // Force Playwright to use the local workspace cache path where the browser was downloaded
+  const absoluteBrowserPath = path.resolve(__dirname, 'ms-playwright');
+  process.env.PLAYWRIGHT_BROWSERS_PATH = absoluteBrowserPath;
+
   console.log('🚀 Secure Cloud Stock Monitor Initializing...');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
