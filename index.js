@@ -60,13 +60,12 @@ function sendTelegramNotification(message) {
   req.end();
 }
 
-// ✨ New Function: Sends the actual binary browser screenshot file straight to Telegram chat
+// Sends the actual binary browser screenshot file straight to Telegram chat
 function sendTelegramPhoto(screenshotBuffer, captionText) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
 
   const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
   
-  // Build standard multi-part form payload to transport raw buffer files via API requests
   const payloadHeader = 
     `--${boundary}\r\n` +
     `Content-Disposition: form-data; name="chat_id"\r\n\r\n${TELEGRAM_CHAT_ID}\r\n` +
@@ -103,7 +102,6 @@ function sendTelegramPhoto(screenshotBuffer, captionText) {
     console.error("[Telegram Media Network Error]: " + err.message);
   });
 
-  // Write segments out cleanly to preserve data integrity of raw image array assets
   req.write(Buffer.from(payloadHeader, 'utf-8'));
   req.write(screenshotBuffer);
   req.write(Buffer.from(payloadFooter, 'utf-8'));
@@ -155,6 +153,8 @@ async function monitorProduct() {
   const page = await context.newPage();
 
   while (true) {
+    let shouldCoolDown = false; // Flag to trace if captcha cooling period is needed
+
     try {
       await page.goto(PRODUCT_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
@@ -163,6 +163,9 @@ async function monitorProduct() {
       if (!productTitleExists) {
         console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Verification Blocked: Encountered a CAPTCHA or security page.`);
         await logPageScreenshot(page, 'VERIFICATION_BLOCKED');
+        
+        // Activate cooling parameters
+        shouldCoolDown = true;
       } else {
         const outOfStockElement = await page.$('#outOfStock, .a-color-price:has-text("Currently unavailable")');
 
@@ -177,10 +180,7 @@ async function monitorProduct() {
           const alertMsg = `🚨 *ALERT! YOUR MONITORED ITEM MIGHT BE IN STOCK!* 🚨\nBuy immediately here: ${PRODUCT_URL}`;
           console.log(`\n${alertMsg}\n`);
           
-          // 1. Instantly generate a crisp layout screenshot buffer
           const inStockBuffer = await page.screenshot({ type: 'jpeg', quality: 75 });
-          
-          // 2. Deliver the graphic photo straight into your personal channel interface natively
           sendTelegramPhoto(inStockBuffer, `🎯 IN-STOCK PROOF SNAPSHOT!\n\nLink: ${PRODUCT_URL}`);
           sendTelegramNotification(alertMsg);
         }
@@ -189,8 +189,14 @@ async function monitorProduct() {
       console.error(`[${new Date().toLocaleTimeString()}] ⚠️ Error:`, error.message);
     }
 
-    const randomInterval = 5000 + Math.floor(Math.random() * 6000);
-    await delay(randomInterval);
+    // Apply delay timing sequence dynamically
+    if (shouldCoolDown) {
+      console.log(`[${new Date().toLocaleTimeString()}] ⏳ Initiating a 2-minute safety pause to reset bot threshold profile...`);
+      await delay(120000); // 2 minutes (120,000 ms) sleep period
+    } else {
+      const randomInterval = 5000 + Math.floor(Math.random() * 6000);
+      await delay(randomInterval);
+    }
   }
 }
 
