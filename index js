@@ -2,22 +2,26 @@ const { chromium } = require('playwright');
 const https = require('https');
 const http = require('http');
 
-// --- CONFIGURATION ---
-const PRODUCT_URL = 'https://amzn.in'; // Your PS5 Slim link
-const WHATSAPP_PHONE = 'YOUR_PHONE_NUMBER_HERE'; // 👈 Include country code (e.g., +919876543210 for India)
-const WHATSAPP_API_KEY = 'YOUR_API_KEY_HERE';   // 👈 Paste the free API key from the bot here
-// ---------------------
+// --- SECURE CONFIGURATION ---
+const PRODUCT_URL = 'https://amzn.in/d/01K4h56l'; 
+const WHATSAPP_PHONE = process.env.WHATSAPP_PHONE;     // Read securely from the cloud server
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY; // Read securely from the cloud server
+// ----------------------------
 
 // Keep-alive server for Render's Free Tier
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Monitor is running alive in the background!\n');
+  res.end('Monitor is running securely in the background!\n');
 }).listen(process.env.PORT || 3000);
 
-// Free function to route alerts to WhatsApp via CallMeBot
 function sendWhatsAppNotification(message) {
+  // Prevent execution if environment variables are missing
+  if (!WHATSAPP_PHONE || !WHATSAPP_API_KEY) {
+    console.error('[WhatsApp Error]: Missing secure environment variables!');
+    return;
+  }
+
   const encodedMessage = encodeURIComponent(message);
-  // Clean phone number from '+' symbol if present for the API URL
   const cleanPhone = WHATSAPP_PHONE.replace('+', '');
   const url = `https://callmebot.com{cleanPhone}&text=${encodedMessage}&apikey=${WHATSAPP_API_KEY}`;
 
@@ -25,7 +29,7 @@ function sendWhatsAppNotification(message) {
     let data = '';
     res.on('data', (chunk) => { data += chunk; });
     res.on('end', () => {
-      console.log(`[WhatsApp Status]: Message dispatched successfully.`);
+      console.log(`[WhatsApp Status]: Secure message dispatched.`);
     });
   }).on("error", (err) => {
     console.error("[WhatsApp Error]: " + err.message);
@@ -35,7 +39,7 @@ function sendWhatsAppNotification(message) {
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function monitorProduct() {
-  console.log('🚀 Cloud PS5 Monitor Initializing with WhatsApp Alerts...');
+  console.log('🚀 Secure Cloud PS5 Monitor Initializing...');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
@@ -60,7 +64,6 @@ async function monitorProduct() {
       console.error(`[${new Date().toLocaleTimeString()}] ⚠️ Error:`, error.message);
     }
 
-    // Randomized human-like delay (roughly 5-8 seconds)
     const randomInterval = 5000 + Math.floor(Math.random() * 3000);
     await delay(randomInterval);
   }
