@@ -1,0 +1,13 @@
+{
+  "name": "amazon-ps5-monitor",
+  "version": "1.0.0",
+  "description": "Free 24/7 PS5 Stock Monitor",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
+
