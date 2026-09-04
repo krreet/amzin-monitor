@@ -67,7 +67,7 @@ async function monitorProduct() {
 
   console.log('🚀 Secure Cloud Stock Monitor Initializing...');
 
-  // Forcefully find the exact binary file in our local build path
+  // Target local browser binary compiled during Render's build step
   const customExecutablePath = path.resolve(
     __dirname, 
     'ms-playwright', 
@@ -76,38 +76,48 @@ async function monitorProduct() {
     'chrome-headless-shell'
   );
 
-  console.log(`🎯 Targeting local browser at: ${customExecutablePath}`);
-
-  // Pass the direct executable path into the launch configuration
   const browser = await chromium.launch({ 
     executablePath: customExecutablePath,
     headless: true 
   });
   
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 }
   });
   const page = await context.newPage();
 
   while (true) {
     try {
+      // Navigate to the target page link
       await page.goto(PRODUCT_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-      const outOfStockElement = await page.$('#outOfStock, .a-color-price:has-text("Currently unavailable")');
+      // 1. SAFETY VALIDATION STEP: Verify if Amazon actually loaded the real item description
+      const productTitleExists = await page.$('#productTitle');
 
-      if (outOfStockElement) {
-        console.log(`[${new Date().toLocaleTimeString()}] ❌ Item is still out of stock.`);
+      if (!productTitleExists) {
+        // If the main title is missing, Amazon likely served a CAPTCHA check or blocked the request
+        console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Verification Blocked: Encountered a CAPTCHA or security page. Skipping this loop to avoid false alarms.`);
       } else {
-        const alertMsg = `🚨 *ALERT! YOUR MONITORED ITEM MIGHT BE IN STOCK!* 🚨\nBuy immediately here: ${PRODUCT_URL}`;
-        console.log(`\n${alertMsg}\n`);
-        
-        sendTelegramNotification(alertMsg);
+        // 2. PARSING STEP: Real product page loaded. Look for the actual unavailable flags.
+        const outOfStockElement = await page.$('#outOfStock, .a-color-price:has-text("Currently unavailable")');
+
+        if (outOfStockElement) {
+          console.log(`[${new Date().toLocaleTimeString()}] ❌ Item is still out of stock.`);
+        } else {
+          // If the product title loaded perfectly, but outOfStock markers are gone: it is in stock!
+          const alertMsg = `🚨 *ALERT! YOUR MONITORED ITEM MIGHT BE IN STOCK!* 🚨\nBuy immediately here: ${PRODUCT_URL}`;
+          console.log(`\n${alertMsg}\n`);
+          
+          sendTelegramNotification(alertMsg);
+        }
       }
     } catch (error) {
       console.error(`[${new Date().toLocaleTimeString()}] ⚠️ Error:`, error.message);
     }
 
-    const randomInterval = 5000 + Math.floor(Math.random() * 3000);
+    // Extended random interval to help bypass bot tracking algorithms (5 to 11 seconds)
+    const randomInterval = 5000 + Math.floor(Math.random() * 6000);
     await delay(randomInterval);
   }
 }
