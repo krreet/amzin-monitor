@@ -5,8 +5,8 @@ const path = require('path');
 
 // --- SECURE CONFIGURATION (READ FROM CLOUD SETTINGS) ---
 const PRODUCT_URL = process.env.PRODUCT_URL;
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN; // Read securely from system memory
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID; // Read securely from system memory
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN; 
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID; 
 // -------------------------------------------------------
 
 // Keep-alive server for Render's Free Tier
@@ -15,7 +15,6 @@ http.createServer((req, res) => {
   res.end('Monitor is running completely securely via Telegram!\n');
 }).listen(process.env.PORT || 3000);
 
-// Official free Telegram message function
 function sendTelegramNotification(message) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error('[Telegram Error]: Missing secure environment variables!');
@@ -25,7 +24,7 @@ function sendTelegramNotification(message) {
   const data = JSON.stringify({
     chat_id: TELEGRAM_CHAT_ID,
     text: message,
-    parse_mode: 'Markdown' // Enhances link formatting
+    parse_mode: 'Markdown'
   });
 
   const options = {
@@ -66,12 +65,25 @@ async function monitorProduct() {
     process.exit(1);
   }
 
-  // Force Playwright to use the local workspace cache path where the browser was downloaded
-  const absoluteBrowserPath = path.resolve(__dirname, 'ms-playwright');
-  process.env.PLAYWRIGHT_BROWSERS_PATH = absoluteBrowserPath;
-
   console.log('🚀 Secure Cloud Stock Monitor Initializing...');
-  const browser = await chromium.launch({ headless: true });
+
+  // Forcefully find the exact binary file in our local build path
+  const customExecutablePath = path.resolve(
+    __dirname, 
+    'ms-playwright', 
+    'chromium_headless_shell-1234', 
+    'chrome-headless-shell-linux64', 
+    'chrome-headless-shell'
+  );
+
+  console.log(`🎯 Targeting local browser at: ${customExecutablePath}`);
+
+  // Pass the direct executable path into the launch configuration
+  const browser = await chromium.launch({ 
+    executablePath: customExecutablePath,
+    headless: true 
+  });
+  
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
   });
