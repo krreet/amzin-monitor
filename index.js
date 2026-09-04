@@ -165,7 +165,7 @@ async function monitorProduct() {
         await logPageScreenshot(page, 'VERIFICATION_BLOCKED');
         
         // Activate cooling parameters
-        shouldCoolDown = true;
+        shouldCoolDown = false;
       } else {
         const outOfStockElement = await page.$('#outOfStock, .a-color-price:has-text("Currently unavailable")');
 
@@ -173,7 +173,7 @@ async function monitorProduct() {
           outOfStockCounter++;
           console.log(`[${new Date().toLocaleTimeString()}] ❌ Item is still out of stock.`);
           
-          if (outOfStockCounter % 10 === 0) {
+          if (outOfStockCounter % 2 === 0) {
             await logPageScreenshot(page, `OUT_OF_STOCK_LOOP_${outOfStockCounter}`);
           }
         } else {
