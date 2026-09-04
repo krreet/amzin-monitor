@@ -2,20 +2,19 @@ const { chromium } = require('playwright');
 const https = require('https');
 const http = require('http');
 
-// --- SECURE CONFIGURATION ---
-const PRODUCT_URL = 'https://amzn.in/d/01K4h56l'; 
-const WHATSAPP_PHONE = process.env.WHATSAPP_PHONE;     // Read securely from the cloud server
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY; // Read securely from the cloud server
-// ----------------------------
+// --- SECURE CONFIGURATION (READ FROM CLOUD SETTINGS) ---
+const PRODUCT_URL = process.env.PRODUCT_URL;           // Read target link securely
+const WHATSAPP_PHONE = process.env.WHATSAPP_PHONE;     // Read phone securely
+const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY; // Read API key securely
+// -------------------------------------------------------
 
 // Keep-alive server for Render's Free Tier
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Monitor is running securely in the background!\n');
+  res.end('Monitor is running completely securely in the background!\n');
 }).listen(process.env.PORT || 3000);
 
 function sendWhatsAppNotification(message) {
-  // Prevent execution if environment variables are missing
   if (!WHATSAPP_PHONE || !WHATSAPP_API_KEY) {
     console.error('[WhatsApp Error]: Missing secure environment variables!');
     return;
@@ -39,7 +38,12 @@ function sendWhatsAppNotification(message) {
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function monitorProduct() {
-  console.log('🚀 Secure Cloud PS5 Monitor Initializing...');
+  if (!PRODUCT_URL) {
+    console.error('[Configuration Error]: No PRODUCT_URL provided in Environment Variables!');
+    process.exit(1);
+  }
+
+  console.log('🚀 Secure Cloud Stock Monitor Initializing...');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
@@ -50,12 +54,13 @@ async function monitorProduct() {
     try {
       await page.goto(PRODUCT_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
+      // Clean check matching Amazon's unavailable architecture
       const outOfStockElement = await page.$('#outOfStock, .a-color-price:has-text("Currently unavailable")');
 
       if (outOfStockElement) {
-        console.log(`[${new Date().toLocaleTimeString()}] ❌ PS5 Slim is still out of stock.`);
+        console.log(`[${new Date().toLocaleTimeString()}] ❌ Item is still out of stock.`);
       } else {
-        const alertMsg = `🚨 ALERT! SONY PS5 SLIM MIGHT BE IN STOCK! 🚨\nBuy immediately here: ${PRODUCT_URL}`;
+        const alertMsg = `🚨 ALERT! YOUR MONITORED ITEM MIGHT BE IN STOCK! 🚨\nBuy immediately here: ${PRODUCT_URL}`;
         console.log(`\n${alertMsg}\n`);
         
         sendWhatsAppNotification(alertMsg);
