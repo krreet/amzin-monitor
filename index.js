@@ -17,6 +17,7 @@ http.createServer((req, res) => {
   res.end('Monitor is running completely securely via Telegram!\n');
 }).listen(process.env.PORT || 3000);
 
+// Unified function to send Markdown alerts to Telegram
 function sendTelegramNotification(message) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error('[Telegram Error]: Missing secure environment variables!');
@@ -44,7 +45,7 @@ function sendTelegramNotification(message) {
     res.on('data', (chunk) => { responseBody += chunk; });
     res.on('end', () => {
       if (res.statusCode === 200) {
-        console.log(`[Telegram Status]: Alert sent successfully.`);
+        console.log(`[Telegram Status]: Message alert sent successfully.`);
       } else {
         console.error(`[Telegram Error]: Received status ${res.statusCode} - ${responseBody}`);
       }
@@ -59,7 +60,57 @@ function sendTelegramNotification(message) {
   req.end();
 }
 
-// Helper function to log base64 data cleanly to Render console
+// ✨ New Function: Sends the actual binary browser screenshot file straight to Telegram chat
+function sendTelegramPhoto(screenshotBuffer, captionText) {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
+
+  const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+  
+  // Build standard multi-part form payload to transport raw buffer files via API requests
+  const payloadHeader = 
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="chat_id"\r\n\r\n${TELEGRAM_CHAT_ID}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="caption"\r\n\r\n${captionText}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="photo"; filename="screenshot.jpg"\r\n` +
+    `Content-Type: image/jpeg\r\n\r\n`;
+
+  const payloadFooter = `\r\n--${boundary}--\r\n`;
+
+  const options = {
+    hostname: 'api.telegram.org',
+    path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
+    method: 'POST',
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`
+    }
+  };
+
+  const req = https.request(options, (res) => {
+    let responseBody = '';
+    res.on('data', (chunk) => { responseBody += chunk; });
+    res.on('end', () => {
+      if (res.statusCode === 200) {
+        console.log(`[Telegram Status]: Image confirmation successfully delivered.`);
+      } else {
+        console.error(`[Telegram Error]: Photo upload hit status ${res.statusCode} - ${responseBody}`);
+      }
+    });
+  });
+
+  req.on("error", (err) => {
+    console.error("[Telegram Media Network Error]: " + err.message);
+  });
+
+  // Write segments out cleanly to preserve data integrity of raw image array assets
+  req.write(Buffer.from(payloadHeader, 'utf-8'));
+  req.write(screenshotBuffer);
+  req.write(Buffer.from(payloadFooter, 'utf-8'));
+  req.end();
+}
+
+// Console logging platform for Base64 debugging architecture
 async function logPageScreenshot(page, logTitle) {
   try {
     const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 50 });
@@ -67,8 +118,10 @@ async function logPageScreenshot(page, logTitle) {
     console.log(`\n--- 📸 BASE64 SCREENSHOT BEGIN [${logTitle}] ---`);
     console.log(`data:image/jpeg;base64,${base64Image}`);
     console.log(`--- 📸 BASE64 SCREENSHOT END [${logTitle}] ---\n`);
+    return screenshotBuffer;
   } catch (error) {
     console.error('⚠️ Failed to capture visual snapshot:', error.message);
+    return null;
   }
 }
 
@@ -105,7 +158,6 @@ async function monitorProduct() {
     try {
       await page.goto(PRODUCT_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-      // Check if Amazon loaded the main product page successfully
       const productTitleExists = await page.$('#productTitle');
 
       if (!productTitleExists) {
@@ -118,7 +170,6 @@ async function monitorProduct() {
           outOfStockCounter++;
           console.log(`[${new Date().toLocaleTimeString()}] ❌ Item is still out of stock.`);
           
-          // Throttled: Print out-of-stock screenshot only once every 10 checks to avoid bloating log files
           if (outOfStockCounter % 10 === 0) {
             await logPageScreenshot(page, `OUT_OF_STOCK_LOOP_${outOfStockCounter}`);
           }
@@ -126,8 +177,11 @@ async function monitorProduct() {
           const alertMsg = `🚨 *ALERT! YOUR MONITORED ITEM MIGHT BE IN STOCK!* 🚨\nBuy immediately here: ${PRODUCT_URL}`;
           console.log(`\n${alertMsg}\n`);
           
-          // Instantly dump the screenshot for verification
-          await logPageScreenshot(page, 'IN_STOCK_CONFIRMED');
+          // 1. Instantly generate a crisp layout screenshot buffer
+          const inStockBuffer = await page.screenshot({ type: 'jpeg', quality: 75 });
+          
+          // 2. Deliver the graphic photo straight into your personal channel interface natively
+          sendTelegramPhoto(inStockBuffer, `🎯 IN-STOCK PROOF SNAPSHOT!\n\nLink: ${PRODUCT_URL}`);
           sendTelegramNotification(alertMsg);
         }
       }
