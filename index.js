@@ -64,7 +64,9 @@ async function monitorProduct() {
     console.error('[Configuration Error]: No PRODUCT_URL provided in Environment Variables!');
     process.exit(1);
   }
-
+ // 👇 ADD THIS LINE right here to tell Playwright where the browser was saved
+  process.env.PLAYWRIGHT_BROWSERS_PATH = './ms-playwright';
+  
   console.log('🚀 Secure Cloud Stock Monitor Initializing...');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
